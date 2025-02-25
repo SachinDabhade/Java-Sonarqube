@@ -1,0 +1,41 @@
+name: DevOps Workflow with SonarQube and Docker Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # First job: SonarQube Analysis
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run SonarScanner
+        run: |
+          docker run --rm -v "$(pwd):/usr/src" sonarsource/sonar-scanner-cli \
+          sonar-scanner \
+            -Dsonar.projectKey=java-sonarqube-test \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=http://13.232.4.242:9093 \
+            -Dsonar.login=sqp_a05953706cba5d8c989d3b2a280f8614e0bc0223
+
+  # Second job: Docker Image Build (depends on the Sonar job)
+  build:
+    needs: sonar  # This ensures that the 'build' job only runs after 'sonar' job is successful
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Build the Docker image
+        env:
+          USER: ${{ secrets.USER }}
+          PASS: ${{ secrets.PASS }}
+        run: |
+          docker build . --file Dockerfile --tag sachindabhade1905/java-sonarqube-test
+          echo $PASS | docker login -u $USER --password-stdin
+          docker push sachindabhade1905/java-sonarqube-test
